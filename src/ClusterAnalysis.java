@@ -37,10 +37,12 @@ public class ClusterAnalysis {
                         List<DataPoint> dataPointsA=clusterA.getDataPoints();
                         List<DataPoint> dataPointsB=clusterB.getDataPoints();
                         double tempDis=0;
+                        double tempEnergy=0;
                         for(int m=0;m<dataPointsA.size();m++){
                             for(int n=0;n<dataPointsB.size();n++){
 
                                 tempDis+=getDistance(dataPointsA.get(m),dataPointsB.get(n));
+                                tempEnergy+=dataPointsA.get(m).getEnergy()+dataPointsB.get(n).getEnergy();
                                // if(tempDis<min){
                                  //   min=tempDis;
                                    // mergeIndexA=i;
@@ -49,10 +51,12 @@ public class ClusterAnalysis {
                             }
 
                         }
+                        tempEnergy/=dataPointsA.size()*dataPointsB.size();
                         tempDis/=dataPointsA.size()*dataPointsB.size();
                         double distanceA=clusterA.distanceFactor(dataPointsA,baseStation);
                         double distanceB=clusterB.distanceFactor(dataPointsB,baseStation);
-                        tempDis*=(distanceA+distanceB)/100;
+                        tempDis+=((distanceA+distanceB)/2/tempEnergy)*5000;
+
                         if (tempDis<min){
                             min=tempDis;
                             mergeIndexA=i;
@@ -80,6 +84,7 @@ public class ClusterAnalysis {
                 DataPoint tempDp = new DataPoint();
                 tempDp.setDataPointName(dp.getDataPointName());
                 tempDp.setDimension(dp.getDimension());
+                tempDp.setEnergy(dp.getEnergy());
                 tempDp.setCluster(clusterA);
                 dpA.add(tempDp);
             }
@@ -133,7 +138,7 @@ public class ClusterAnalysis {
         List<DataPoint> temp = cluster.getDataPoints();
         int len = temp.size();
         int index = 0;
-        double min = Double.MAX_VALUE;
+        double max = 0;
         if (temp.size() == 1) return temp.get(0);
         else {
             for (int i = 0; i < len; i++) {
@@ -143,8 +148,9 @@ public class ClusterAnalysis {
                         distance += getDistance(temp.get(i), temp.get(j)) * getDistance(temp.get(i), temp.get(j));
                     }
                 }
-                if (min > distance * temp.get(i).getEnergy()) {
-                    min = distance * temp.get(i).getEnergy();
+                distance/=temp.size();
+                if (max < distance+temp.get(i).getEnergy()) {
+                    max = distance +temp.get(i).getEnergy();
                     index = i;
                 }
 
@@ -205,10 +211,24 @@ public class ClusterAnalysis {
 
     }
 
+    public static boolean flag(List<Cluster> finalclusters){
+        boolean temp=true;
+        int count=0;
+        for (Cluster t:finalclusters){
+            List<DataPoint> ps=t.getDataPoints();
+            for (DataPoint da:ps){
+                if (da.getEnergy()<=0) {count++;}
+            }
+        }
+        if (count>0) {temp=false;}
+        return temp;
+
+    }
+
     public static void main(String[] args){
         ArrayList<DataPoint> dpoints = new ArrayList<DataPoint>();
         double[][] matrix=new double[100][2];
-        double energyinit=500;
+        double energyinit=1000;
 //        for (int i=0;i<100;i++){                        //初始化各个节点，初始能量0.05，坐标随机分布
 //            matrix[i][0]= Math.random()*100;
 //            matrix[i][1]=Math.random()*100;
@@ -234,6 +254,9 @@ public class ClusterAnalysis {
         } catch (Exception e) {
             e.printStackTrace();
         }
+//        for(DataPoint temp:dpoints){
+//            System.out.println(temp.getEnergy()+temp.getDataPointName());
+//        }
 
 //        Iterator<DataPoint> iterator = dpoints.iterator();
 //        while (iterator.hasNext()) {
@@ -303,39 +326,63 @@ public class ClusterAnalysis {
             }
             if (temp<energycompare) {energycompare=temp;
             clusterfinal=clusterNum;}
-//            System.out.println(clusterNum+" "+temp+" "+clusterfinal+" "+energycompare);
+          System.out.println(clusterNum+" "+temp+" "+clusterfinal+" "+energycompare);
         }
+//        System.out.println(clusterfinal+" sign");
         List<Cluster> finalclusters=ca.startAnalysis(dpoints, clusterfinal);
-        boolean flag=true;
-        int count=0;
-        for (Cluster t:finalclusters){
-            List<DataPoint> ps=t.getDataPoints();
-            for (int i=0;i<ps.size();i++){
-                if (ps.get(i).getEnergy()<=0) count++;
+        int round=0;   //进行的轮数，可以衡量时间
+        System.out.println("group"+finalclusters.size());
+        for (Cluster cl:finalclusters){
+            DataPoint chi=choosehead(cl);
+            cl.setClusterhead(chi);
+            double [] temp=chi.getDimension();
+            for (double i:temp){
+//            System.out.print(i+" ");
+}
+//            System.out.println();
+
+        }
+        for(Cluster cl:finalclusters){
+            System.out.println("------"+cl.getClusterName()+"------");
+            List<DataPoint> tempDps=cl.getDataPoints();
+            for(DataPoint tempdp:tempDps){
+                System.out.println(tempdp.getDataPointName());
+                double []tempdimension=tempdp.getDimension();
+                for (double i:tempdimension) {
+//                    System.out.print(i+" ");
+
+                }
+//                System.out.println();
             }
         }
-        if (count>0) flag=false;
-        while(flag){
+        while(flag(finalclusters)){
+            double Eres=0;
+            for (Cluster cl:finalclusters){
+                energychange(cl,cl.getClusterhead(),baseStation,L);
+                if (cl.getClusterhead().getEnergy()<energyinit/2){
+                    cl.setClusterhead(choosehead(cl));
+                }
+                List<DataPoint> temp=cl.getDataPoints();
+                for(DataPoint da: temp){
+                    Eres+=da.getEnergy();
+                }
+            }
+            round++;
+//            System.out.println("round"+round+" "+"Energytotal"+Eres);
+        }
 
+        for (Cluster cl:finalclusters) {
+
+            List<DataPoint> temp = cl.getDataPoints();
+            for (DataPoint da : temp) {
+//                System.out.println(da.getDataPointName()+" "+da.getEnergy());
+                round++;
+            }
         }
 
 
 
 
-
-//        for(Cluster cl:finalclusters){
-//            System.out.println("------"+cl.getClusterName()+"------");
-//            List<DataPoint> tempDps=cl.getDataPoints();
-//            for(DataPoint tempdp:tempDps){
-//                System.out.println(tempdp.getDataPointName());
-//                double []tempdimension=tempdp.getDimension();
-//                for (double i:tempdimension) {
-//                    System.out.print(i+" ");
-//
-//                }
-//                System.out.println();
-//            }
-//        }
 
     }
 }

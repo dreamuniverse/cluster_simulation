@@ -38,6 +38,7 @@ public class DataPoint {
         this.cluster = cluster;
     }
 
+    public void setEnergy(double energy) {this.energy =energy;}
     public String getDataPointName() {
         return dataPointName;
     }
